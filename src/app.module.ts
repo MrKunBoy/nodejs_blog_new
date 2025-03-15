@@ -11,10 +11,19 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { TransformInterceptor } from './core/transform.interceptor';
+import { PostsModule } from './modules/posts/posts.module';
+import { CommentsModule } from './modules/comments/comments.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { PostCategoriesModule } from './modules/post-categories/post-categories.module';
+import { TagsModule } from './modules/tags/tags.module';
+import { PostTagsModule } from './modules/post-tags/post-tags.module';
+import { LikesModule } from './modules/likes/likes.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { MediasModule } from './modules/medias/medias.module';
 
 @Module({
   imports: [
-    UsersModule,
     AuthModule,
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forRootAsync({
@@ -51,6 +60,17 @@ import { TransformInterceptor } from './core/transform.interceptor';
       }),
       inject: [ConfigService],
     }),
+    UsersModule,
+    PostsModule,
+    CommentsModule,
+    CategoriesModule,
+    PostCategoriesModule,
+    TagsModule,
+    PostTagsModule,
+    LikesModule,
+    NotificationsModule,
+    SettingsModule,
+    MediasModule,
   ],
   controllers: [AppController],
   providers: [
