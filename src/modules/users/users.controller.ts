@@ -19,7 +19,7 @@ export class UsersController {
 
   @Post()
   @Public()
-  create(@Body() createUserDto: CreateUserDto) {
+  async create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
 
@@ -33,17 +33,17 @@ export class UsersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
   @Patch()
-  update(@Body() updateUserDto: UpdateUserDto) {
+  async update(@Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(updateUserDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string) {
     return this.usersService.remove(id);
   }
 }
