@@ -1,16 +1,21 @@
-import { IsMongoId, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsOptional, IsArray, IsString } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateCategoryDto } from './create-category.dto';
 
-// DTO for updating Category
-export class UpdateCategoryDto {
-    @IsMongoId()
-    @IsNotEmpty()
-    _id: string;
-  
-    @IsOptional()
-    @IsString()
-    name?: string;
-  
-    @IsOptional()
-    @IsString()
-    slug?: string;
-  }
+// Cập nhật DTO cho Update
+export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {}
+// export class UpdateCategoryDto {
+// 	@IsOptional()
+// 	name?: string;
+
+// 	@IsOptional()
+// 	description?: string;
+
+// 	@IsOptional()
+// 	@IsArray()
+// 	@IsString({ each: true }) // Đảm bảo mỗi phần tử là string (tên của subcategory)
+// 	subcategories?: string[]; // subcategories là mảng các tên (string[])
+
+// 	@IsOptional()
+// 	isActive?: boolean;
+// }

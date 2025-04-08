@@ -1,12 +1,5 @@
-import { IsBoolean, IsMongoId, IsNotEmpty, IsOptional } from "class-validator";
+import { PartialType } from "@nestjs/swagger";
+import { CreateNotificationDto } from "./create-notification.dto";
 
 // DTO for updating Notification
-export class UpdateNotificationDto {
-    @IsMongoId()
-    @IsNotEmpty()
-    _id: string;
-  
-    @IsOptional()
-    @IsBoolean()
-    is_read?: boolean;
-  }
+export class UpdateNotificationDto extends PartialType(CreateNotificationDto) {}

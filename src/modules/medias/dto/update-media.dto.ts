@@ -1,16 +1,5 @@
-import { IsMongoId, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { PartialType } from "@nestjs/swagger";
+import { CreateMediaDto } from "./create-media.dto";
 
 // DTO for updating Media
-export class UpdateMediaDto {
-    @IsMongoId()
-    @IsNotEmpty()
-    _id: string;
-  
-    @IsOptional()
-    @IsString()
-    file_path?: string;
-  
-    @IsOptional()
-    @IsString()
-    file_type?: string;
-  }
+export class UpdateMediaDto extends PartialType(CreateMediaDto) {}

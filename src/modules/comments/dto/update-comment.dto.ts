@@ -1,12 +1,7 @@
-import { IsMongoId, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { PartialType } from '@nestjs/swagger';
+import { CreateCommentDto } from './create-comment.dto';
+import { IsOptional, IsString } from 'class-validator';
+import e from 'express';
 
 // DTO for updating Comment
-export class UpdateCommentDto {
-    @IsMongoId()
-    @IsNotEmpty()
-    _id: string;
-  
-    @IsOptional()
-    @IsString()
-    content?: string;
-  }
+export class UpdateCommentDto extends PartialType(CreateCommentDto) {}

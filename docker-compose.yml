@@ -1,5 +1,6 @@
 services:
   mongodb:
+    container_name: blog_mongodb
     image: mongo:5.0.15
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
@@ -8,8 +9,31 @@ services:
       - 27017:27017
     volumes:
       - mongodb_data_container:/data/db
+    restart: unless-stopped
+  blog_redis:
+    container_name: blog_redis
+    image: redis:alpine
+    expose:
+      - 6379
+    ports:
+      - 6379:6379 # Public port để lát nữa test multiple worker
+    restart: unless-stopped
 
+  redis_commander:
+    container_name: redis_commander
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:blog_redis:6379
+    ports:
+      - 8088:8081
+    depends_on:
+      - blog_redis
+    restart: unless-stopped
 volumes:
   mongodb_data_container:
 
-    # docker compose -p hoidanit-mongodb-4rn up -d
+networks:
+  default:
+    driver: bridge
+
+    # docker compose -p nvt-mongodb-4rn up -d

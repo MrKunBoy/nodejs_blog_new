@@ -1,243 +1,116 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { InjectModel } from '@nestjs/mongoose';
-import { User, UserDocument } from './schemas/user.schema';
-import { Model } from 'mongoose';
-import { hashPasswordHelper } from '@/helpers/utils';
-import aqp from 'api-query-params';
-import mongoose from 'mongoose';
-import {
-  ChangePassworđto,
-  CheckCodeAuthDto,
-  CreateAuthDto,
-} from '@/auth/dto/create-auth.dto';
-import { v4 as uuidv4 } from 'uuid';
-import dayjs from 'dayjs';
-import { MailerService } from '@nestjs-modules/mailer';
+import { User } from './schemas/user.schema';
+import { BaseServiceAbstract } from '@/services/base/base.abstract.service';
+import { UsersRepositoryInterface } from './interfaces/user.interface';
+import { UserRolesService } from '../user-roles/user-roles.service';
+import { FindAllResponse } from '@/types/common.type';
+import { USER_ROLE } from '../user-roles/schemas/user-role.schema';
+import { hashContentHelper } from '@/shared/helpers/utils';
 
 @Injectable()
-export class UsersService {
-  constructor(
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
-    private readonly mailerService: MailerService,
-  ) {}
+export class UsersService extends BaseServiceAbstract<User> {
+	constructor(
+		@Inject('UsersRepositoryInterface')
+		private readonly usersRepository: UsersRepositoryInterface,
+		private readonly userRolesService: UserRolesService,
+	) {
+		super(usersRepository);
+	}
 
-  isEmailExist = async (email: string) => {
-    const user = await this.userModel.exists({ email });
-    if (user) return true;
-    return false;
-  };
+	//create a new user
+	async create(createUserDto: CreateUserDto): Promise<User> {
+		//check if the default user role exists
+		let user_role = await this.userRolesService.findOneByCondition({
+			name: USER_ROLE.USER,
+		});
 
-  async create(createUserDto: CreateUserDto) {
-    const { name, email, password, phone, address, image } = createUserDto;
+		if (!user_role) {
+			//create a default role if it doesn't exist
+			user_role = await this.userRolesService.create({
+				name: USER_ROLE.USER,
+			});
+		}
 
-    //check if email already exist
-    const isExist = await this.isEmailExist(email);
-    if (isExist) {
-      throw new BadRequestException(`${email} already exists`);
-    }
+		// Hash the password
+		const hashed_password = await hashContentHelper(createUserDto.password);
 
-    //hash password
-    const hashPassword = await hashPasswordHelper(password);
-    const user = await this.userModel.create({
-      name,
-      email,
-      password: hashPassword,
-      phone,
-      address,
-      image,
-    });
-    return { _id: user._id };
-    // return user;
-  }
+		// Generate a new unique name for the user
+		let new_name = `${createUserDto.email.split('@')[0]}${Math.floor(
+			10 + Math.random() * (999 - 10),
+		)}`;
+		// Check if the generated name already exists
+		let existed_user = await this.usersRepository.findOneByCondition({
+			name: new_name,
+		});
+		while (existed_user) {
+			new_name = `${createUserDto.email.split('@')[0]}${Math.floor(
+				10 + Math.random() * (999 - 10),
+			)}`;
+			existed_user = await this.usersRepository.findOneByCondition({
+				name: new_name,
+			});
+		}
 
-  async findAll(query: string, current: number, pageSize: number) {
-    const { filter, sort } = aqp(query);
+		//create and return the new user
+		const user = await this.usersRepository.create({
+			...createUserDto,
+			name: new_name,
+			role: user_role._id,
+			password: hashed_password,
+		});
 
-    if (filter.current) delete filter.current;
-    if (filter.pageSize) delete filter.pageSize;
+		return user;
+	}
 
-    if (!current) current = 1;
-    if (!pageSize) pageSize = 10;
+	// Retrieve all users with optional filters and pagination
+	async findAll(
+		filter?: object,
+		options?: object,
+	): Promise<FindAllResponse<User>> {
+		return await this.usersRepository.findAllWithSubFields(filter, {
+			...options,
+			populate: ['role'],
+		});
+	}
 
-    const totalItems = (await this.userModel.find(filter)).length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const skip = (current - 1) * pageSize;
-    const results = await this.userModel
-      .find(filter)
-      .limit(pageSize)
-      .skip(skip)
-      .select('-password')
-      .sort(sort as any);
-    return {
-      results,
-      meta: {
-        current: current,
-        pageSize: pageSize,
-        total: totalItems,
-        pages: totalPages,
-      },
-    };
-  }
+	// Get user by email
+	async getUserByEmail(email: string): Promise<User> {
+		try {
+			const user = await this.usersRepository.findOneByCondition({ email });
+			if (!user) {
+				throw new NotFoundException();
+			}
+			return user;
+		} catch (error) {
+			throw error;
+		}
+	}
 
-  async findOne(_id: string) {
-    if (mongoose.isValidObjectId(_id)) {
-      return await this.userModel.findById(_id).select('-password');
-    } else {
-      throw new BadRequestException('Invalid ID');
-    }
-  }
+	// Get user along with their role
+	async getUserWithRole(user_id: string): Promise<User> {
+		try {
+			const user = await this.usersRepository.getUserWithRole(user_id);
+			if (!user) {
+				throw new NotFoundException('User not found');
+			}
+			return user;
+		} catch (error) {
+			throw error;
+		}
+	}
 
-  async findByEmail(email: string) {
-    const user = await this.userModel.findOne({ email: email });
-    if (user) return user;
-    return null;
-  }
-
-  async update(updateUserDto: UpdateUserDto) {
-    return await this.userModel.updateOne(
-      { _id: updateUserDto._id },
-      { ...updateUserDto },
-    );
-  }
-
-  async remove(_id: string) {
-    if (mongoose.isValidObjectId(_id)) {
-      return await this.userModel.deleteOne({ _id });
-    } else {
-      throw new BadRequestException('Invalid ID');
-    }
-  }
-
-  async handleRegister(registerDto: CreateAuthDto) {
-    const { name, email, password } = registerDto;
-
-    //check if email already exist
-    const isExist = await this.isEmailExist(email);
-    if (isExist) {
-      throw new BadRequestException(`${email} already exists`);
-    }
-
-    //hash password
-    const hashPassword = await hashPasswordHelper(password);
-    const codeId = uuidv4();
-    const user = await this.userModel.create({
-      name,
-      email,
-      password: hashPassword,
-      isActive: false,
-      codeId: codeId,
-      codeExpired: dayjs().add(5, 'minutes'), // manipulate
-    });
-
-    //send email
-    this.mailerService.sendMail({
-      to: user.email, // list of receivers
-      subject: 'Activate your account', // Subject line
-      template: 'register.hbs',
-      context: {
-        name: user?.name ?? user.email,
-        activationCode: codeId,
-      },
-    });
-    return { _id: user._id };
-  }
-
-  async handleActive(codeAuthDto: CheckCodeAuthDto) {
-    const user = await this.userModel.findOne({
-      _id: codeAuthDto._id,
-      codeId: codeAuthDto.code,
-    });
-    if (!user) {
-      throw new BadRequestException('Invalid activation code or expired');
-    }
-
-    //compare code
-    const isCodeValid = dayjs().isBefore(user.codeExpired);
-    if (!isCodeValid) {
-      throw new BadRequestException('Invalid activation code or expired');
-    } else {
-      //update user
-      await this.userModel.updateOne(
-        { _id: codeAuthDto._id },
-        { isActive: true, codeId: null, codeExpired: null },
-      );
-      return { isCodeValid };
-    }
-  }
-
-  async retryActive(email: string) {
-    const user = await this.userModel.findOne({ email });
-    if (!user) {
-      throw new BadRequestException('Account not found');
-    }
-    if (user.isActive) {
-      throw new BadRequestException('Account already active');
-    }
-    const codeId = uuidv4();
-    //update data
-    await user.updateOne({
-      codeId: codeId,
-      codeExpired: dayjs().add(5, 'minutes'), // manipulate
-    });
-    //re-send code
-    this.mailerService.sendMail({
-      to: user.email, // list of receivers
-      subject: 'Activate your account', // Subject line
-      template: 'register.hbs',
-      context: {
-        name: user?.name ?? user.email,
-        activationCode: codeId,
-      },
-    });
-    return { _id: user._id };
-  }
-
-  async retryPassword(email: string) {
-    const user = await this.userModel.findOne({ email });
-    if (!user) {
-      throw new BadRequestException('Account not found');
-    }
-
-    const codeId = uuidv4();
-    //update data
-    await user.updateOne({
-      codeId: codeId,
-      codeExpired: dayjs().add(5, 'minutes'), // manipulate
-    });
-    //re-send code
-    this.mailerService.sendMail({
-      to: user.email, // list of receivers
-      subject: 'Change your password', // Subject line
-      template: 'register.hbs',
-      context: {
-        name: user?.name ?? user.email,
-        activationCode: codeId,
-      },
-    });
-    return { _id: user._id, email: user.email };
-  }
-
-  async changePassword(data: ChangePassworđto) {
-    if (data.confirmPassword !== data.password) {
-      throw new BadRequestException('Passwords do not match');
-    }
-    //check email
-    const user = await this.userModel.findOne({ email: data.email });
-    if (!user) {
-      throw new BadRequestException('Account not found change password');
-    }
-
-    //compare code
-    const isCodeValid = dayjs().isBefore(user.codeExpired);
-    if (!isCodeValid) {
-      throw new BadRequestException('Invalid activation code or expired');
-    } else {
-      //update password
-      const newPassword = await hashPasswordHelper(data.password);
-      await user.updateOne({ password: newPassword });
-      return { isCodeValid };
-    }
-  }
+	// Set the refresh token for a user
+	async setCurrentRefreshToken(
+		id: string,
+		hashed_token: string,
+	): Promise<void> {
+		try {
+			await this.usersRepository.update(id, {
+				current_refresh_token: hashed_token,
+			});
+		} catch (error) {
+			throw error;
+		}
+	}
 }

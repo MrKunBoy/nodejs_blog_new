@@ -7,8 +7,8 @@ export type NotificationDocument = HydratedDocument<Notification>;
 
 @Schema({ timestamps: true }) // Automatically adds createdAt field
 export class Notification {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true })
-  user_id: mongoose.Schema.Types.ObjectId;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  user: User;
 
   @Prop({ required: true }) // Notification message
   message: string;
